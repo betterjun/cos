@@ -211,3 +211,85 @@ func (c *COS) DeleteFile(bucket, path string) (err error, jsonResp *simplejson.J
 	sign := SignOnce(c.AppID, c.SecretID, c.SecretKey, bucket, fileid)
 	return do("POST", url, sign, "application/json", body)
 }
+
+func (c *COS) UploadFileSlice(bucket, filePath, localFileName string) (err error, jsonResp *simplejson.Json) {
+	fileHandle, err := os.Open(localFileName)
+	if err != nil {
+		return err, nil
+	}
+	fileContent, err := ioutil.ReadAll(fileHandle)
+	if err != nil {
+		return err, nil
+	}
+
+	sha := fmt.Sprintf("%x", sha1.Sum(nil))
+	fileSize := int64(len(fileContent))
+	err, ret := c.createUploadSliceSession(bucket, filePath, sha, fileSize)
+
+	var session string
+	var offset int64
+	var sliceSize int64
+	for {
+		if err != nil || ret.Get("code").MustInt() != 0 {
+			return err, nil
+		}
+
+		retData := ret.Get("data")
+		if retData.Get("url").MustString() != "" { // 已传完
+			break
+		}
+
+		if session == "" {
+			session = retData.Get("session").MustString()
+		}
+		if offset == 0 {
+			offset = retData.Get("offset").MustInt64()
+		}
+		if sliceSize == 0 {
+			retData.Get("slice_size").MustInt64()
+		}
+
+		err, ret = c.uploadSlice(fileContent[offset:offset+sliceSize+1], bucket, filePath, session, offset)
+		offset = offset + sliceSize
+		if offset >= fileSize {
+			break
+		}
+	}
+	return nil, nil
+}
+
+func (c *COS) createUploadSliceSession(bucket, filePath, sha string, fileSize int64) (err error, jsonResp *simplejson.Json) {
+	buffer := &bytes.Buffer{}
+	writer := multipart.NewWriter(buffer)
+	writer.WriteField("op", "upload_slice")
+	writer.WriteField("filesize", fmt.Sprint(fileSize))
+	writer.WriteField("sha", sha)
+	writer.Close()
+
+	url := formatURL(c.AppID, bucket, filePath)
+	url = strings.TrimSuffix(url, "/")
+	fmt.Println("url is ", url)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
+	return do("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
+}
+
+func (c *COS) uploadSlice(fileContent []byte, bucket, filePath, session string, offset int64) (err error, jsonResp *simplejson.Json) {
+	buffer := &bytes.Buffer{}
+	writer := multipart.NewWriter(buffer)
+	writer.WriteField("op", "upload_slice")
+	writer.WriteField("sha", fmt.Sprintf("%x", sha1.Sum(fileContent)))
+	writer.WriteField("session", session)
+	writer.WriteField("offset", fmt.Sprint(offset))
+	fcField, _ := writer.CreateFormField("filecontent")
+	_, err = fcField.Write(fileContent)
+	if err != nil {
+		return err, nil
+	}
+	writer.Close()
+
+	url := formatURL(c.AppID, bucket, filePath)
+	url = strings.TrimSuffix(url, "/")
+	fmt.Println("url is ", url)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
+	return do("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
+}
