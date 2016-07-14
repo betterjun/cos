@@ -2,7 +2,10 @@ package cos
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha1"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,14 +13,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/betterjun/vs/b64"
-	"github.com/betterjun/vs/hashfun"
 	"github.com/bitly/go-simplejson"
 )
 
 const (
-	str           = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	cosHostFormat = "http://web.file.myqcloud.com/files/v1/%v/%v/%v/"
+	str             = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	directoryFormat = "http://web.file.myqcloud.com/files/v1/%v/%v/%v/"
+	fileFormat      = "http://web.file.myqcloud.com/files/v1/%v/%v/%v"
 )
 
 func appSign(appID, secretID, secretKey, bucket, fileid string, expired int64) string {
@@ -25,9 +27,19 @@ func appSign(appID, secretID, secretKey, bucket, fileid string, expired int64) s
 	connectedString := fmt.Sprintf("a=%v&k=%v&e=%v&t=%v&r=%v&f=%v&b=%v",
 		appID, secretID, expired, time.Now().Unix(), genRandString(32), fileid, bucket)
 
-	hashValue := hashfun.HmacSha1([]byte(connectedString), []byte(secretKey))
-	hashValue = append(hashValue, []byte(connectedString)...)
-	return string(b64.Encode(hashValue))
+	data := []byte(connectedString)
+	hm := hmac.New(sha1.New, []byte(secretKey))
+	hm.Write(data)
+	hashValue := hm.Sum(nil)
+	hashValue = append(hashValue, data...)
+
+	ret := make([]byte, base64.StdEncoding.EncodedLen(len(hashValue)))
+	base64.StdEncoding.Encode(ret, hashValue)
+	return string(ret)
+
+	//hashValue := hashfun.HmacSha1([]byte(connectedString), []byte(secretKey))
+	//hashValue = append(hashValue, []byte(connectedString)...)
+	//return string(b64.Encode(hashValue))
 }
 
 func genRandString(size int) string {
@@ -55,11 +67,15 @@ func getEscapedURL(path string) string {
 	return u.EscapedPath()
 }
 
-func formatURL(appID, bucket, path string) string {
-	return fmt.Sprintf(cosHostFormat, appID, bucket, getEscapedURL(trimPath(path)))
+func formatDirectoryURL(appID, bucket, path string) string {
+	return fmt.Sprintf(directoryFormat, appID, bucket, getEscapedURL(trimPath(path)))
 }
 
-func do(method, url, sign, contentType string, content []byte) (err error, jsrResp *simplejson.Json) {
+func formatFileURL(appID, bucket, path string) string {
+	return fmt.Sprintf(fileFormat, appID, bucket, getEscapedURL(trimPath(path)))
+}
+
+func doHttpRequest(method, url, sign, contentType string, content []byte) (err error, jsrResp *simplejson.Json) {
 	req, err := http.NewRequest(method, url, bytes.NewReader(content))
 	if err != nil {
 		return fmt.Errorf("create request error: %v", err), nil
@@ -77,7 +93,7 @@ func do(method, url, sign, contentType string, content []byte) (err error, jsrRe
 		return fmt.Errorf("read response error: %v", err), nil
 	}
 
-	fmt.Println("do resp :", string(body))
+	//fmt.Println("doHttpRequest resp :", string(body))
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("HTTP StatusCode: %v, Body: %s", resp.StatusCode, body), nil
 	}

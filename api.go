@@ -8,15 +8,13 @@ import (
 	"mime/multipart"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
 )
 
 const (
-	COS_HOST            = "http://web.file.myqcloud.com"
-	Default_Expire_Time = 3600 * 24 * 30
+	defaultSignExpireTime = 3600 * 24
 )
 
 // 生成多次有效的sign，签名中不绑定文件id，需要设置大于当前时间的有效期，有效期内此签名可多次使用，有效期最长可设置三个月。
@@ -48,10 +46,9 @@ func (c *COS) CreateFolder(bucket, path string) (err error, jsonResp *simplejson
 		return err, nil
 	}
 
-	url := formatURL(c.AppID, bucket, path)
-	fmt.Println("url is ", url)
-	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
-	return do("POST", url, sign, "application/json", body)
+	url := formatDirectoryURL(c.AppID, bucket, path)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
+	return doHttpRequest("POST", url, sign, "application/json", body)
 }
 
 /*
@@ -64,7 +61,6 @@ context	否	String	透传字段，查看第一页，则传空字符串。若需�
 func (c *COS) ListFolder(bucket, path string, num uint64, pattern string, order int8, context string) (err error, jsonResp *simplejson.Json) {
 	params := url.Values{}
 	params.Add("op", "list")
-
 	if num <= 0 {
 		num = 20
 	}
@@ -80,11 +76,10 @@ func (c *COS) ListFolder(bucket, path string, num uint64, pattern string, order 
 		params.Add("context", context)
 	}
 
-	url := formatURL(c.AppID, bucket, path)
+	url := formatDirectoryURL(c.AppID, bucket, path)
 	url += "?" + params.Encode()
-	fmt.Println("url is ", url)
-	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
-	return do("GET", url, sign, "application/json", nil)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
+	return doHttpRequest("GET", url, sign, "application/json", nil)
 }
 
 func (c *COS) UpdateFolder(bucket, path, attribute string) (err error, jsonResp *simplejson.Json) {
@@ -93,44 +88,38 @@ func (c *COS) UpdateFolder(bucket, path, attribute string) (err error, jsonResp 
 	if attribute != "" {
 		jsr.Set("biz_attr", attribute)
 	}
-
 	body, err := jsr.Encode()
 	if err != nil {
 		return err, nil
 	}
 
-	url := formatURL(c.AppID, bucket, path)
-	fmt.Println("url is ", url)
+	url := formatDirectoryURL(c.AppID, bucket, path)
 	fileid := "/" + c.AppID + "/" + bucket + "/" + path + "/"
 	sign := SignOnce(c.AppID, c.SecretID, c.SecretKey, bucket, fileid)
-	return do("POST", url, sign, "application/json", body)
+	return doHttpRequest("POST", url, sign, "application/json", body)
 }
 
 func (c *COS) QueryFolder(bucket, path string) (err error, jsonResp *simplejson.Json) {
 	params := url.Values{}
 	params.Add("op", "stat")
-
-	url := formatURL(c.AppID, bucket, path)
+	url := formatDirectoryURL(c.AppID, bucket, path)
 	url += "?" + params.Encode()
-	fmt.Println("url is ", url)
-	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
-	return do("GET", url, sign, "application/json", nil)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
+	return doHttpRequest("GET", url, sign, "application/json", nil)
 }
 
 func (c *COS) DeleteFolder(bucket, path string) (err error, jsonResp *simplejson.Json) {
 	jsr := simplejson.New()
 	jsr.Set("op", "delete")
-
 	body, err := jsr.Encode()
 	if err != nil {
 		return err, nil
 	}
 
-	url := formatURL(c.AppID, bucket, path)
-	fmt.Println("url is ", url)
+	url := formatDirectoryURL(c.AppID, bucket, path)
 	fileid := "/" + c.AppID + "/" + bucket + "/" + path + "/"
 	sign := SignOnce(c.AppID, c.SecretID, c.SecretKey, bucket, fileid)
-	return do("POST", url, sign, "application/json", body)
+	return doHttpRequest("POST", url, sign, "application/json", body)
 }
 
 func (c *COS) UploadFile(bucket, filePath, localFileName string) (err error, jsonResp *simplejson.Json) {
@@ -154,13 +143,11 @@ func (c *COS) UploadFile(bucket, filePath, localFileName string) (err error, jso
 	if err != nil {
 		return err, nil
 	}
-	writer.Close() // do not defer it, need close it before sending
+	writer.Close() // doHttpRequest not defer it, need close it before sending
 
-	url := formatURL(c.AppID, bucket, filePath)
-	url = strings.TrimSuffix(url, "/")
-	fmt.Println("url is ", url)
-	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
-	return do("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
+	url := formatFileURL(c.AppID, bucket, filePath)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
+	return doHttpRequest("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
 }
 
 func (c *COS) UpdateFile(bucket, path, attribute string) (err error, jsonResp *simplejson.Json) {
@@ -169,47 +156,39 @@ func (c *COS) UpdateFile(bucket, path, attribute string) (err error, jsonResp *s
 	if attribute != "" {
 		jsr.Set("biz_attr", attribute)
 	}
-
 	body, err := jsr.Encode()
 	if err != nil {
 		return err, nil
 	}
 
-	url := formatURL(c.AppID, bucket, path)
-	url = strings.TrimSuffix(url, "/")
-	fmt.Println("url is ", url)
+	url := formatFileURL(c.AppID, bucket, path)
 	fileid := "/" + c.AppID + "/" + bucket + "/" + path
 	sign := SignOnce(c.AppID, c.SecretID, c.SecretKey, bucket, fileid)
-	return do("POST", url, sign, "application/json", body)
+	return doHttpRequest("POST", url, sign, "application/json", body)
 }
 
 func (c *COS) QueryFile(bucket, path string) (err error, jsonResp *simplejson.Json) {
 	params := url.Values{}
 	params.Add("op", "stat")
 
-	url := formatURL(c.AppID, bucket, path)
-	url = strings.TrimSuffix(url, "/")
+	url := formatFileURL(c.AppID, bucket, path)
 	url += "?" + params.Encode()
-	fmt.Println("url is ", url)
-	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
-	return do("GET", url, sign, "application/json", nil)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
+	return doHttpRequest("GET", url, sign, "application/json", nil)
 }
 
 func (c *COS) DeleteFile(bucket, path string) (err error, jsonResp *simplejson.Json) {
 	jsr := simplejson.New()
 	jsr.Set("op", "delete")
-
 	body, err := jsr.Encode()
 	if err != nil {
 		return err, nil
 	}
 
-	url := formatURL(c.AppID, bucket, path)
-	url = strings.TrimSuffix(url, "/")
-	fmt.Println("url is ", url)
+	url := formatFileURL(c.AppID, bucket, path)
 	fileid := "/" + c.AppID + "/" + bucket + "/" + path
 	sign := SignOnce(c.AppID, c.SecretID, c.SecretKey, bucket, fileid)
-	return do("POST", url, sign, "application/json", body)
+	return doHttpRequest("POST", url, sign, "application/json", body)
 }
 
 func (c *COS) UploadFileSlice(bucket, filePath, localFileName string) (err error, jsonResp *simplejson.Json) {
@@ -238,7 +217,6 @@ func (c *COS) UploadFileSlice(bucket, filePath, localFileName string) (err error
 		if retData.Get("url").MustString() != "" { // 已传完
 			break
 		}
-
 		if session == "" {
 			session = retData.Get("session").MustString()
 		}
@@ -266,11 +244,9 @@ func (c *COS) createUploadSliceSession(bucket, filePath, sha string, fileSize in
 	writer.WriteField("sha", sha)
 	writer.Close()
 
-	url := formatURL(c.AppID, bucket, filePath)
-	url = strings.TrimSuffix(url, "/")
-	fmt.Println("url is ", url)
-	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
-	return do("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
+	url := formatFileURL(c.AppID, bucket, filePath)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
+	return doHttpRequest("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
 }
 
 func (c *COS) uploadSlice(fileContent []byte, bucket, filePath, session string, offset int64) (err error, jsonResp *simplejson.Json) {
@@ -287,9 +263,7 @@ func (c *COS) uploadSlice(fileContent []byte, bucket, filePath, session string, 
 	}
 	writer.Close()
 
-	url := formatURL(c.AppID, bucket, filePath)
-	url = strings.TrimSuffix(url, "/")
-	fmt.Println("url is ", url)
-	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, Default_Expire_Time)
-	return do("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
+	url := formatFileURL(c.AppID, bucket, filePath)
+	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
+	return doHttpRequest("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
 }
