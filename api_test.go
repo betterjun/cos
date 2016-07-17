@@ -25,22 +25,14 @@ func TestFunction(t *testing.T) {
 
 	dirname := "testDir"
 	file := dirname + "/" + "testFile.txt"
-	localFileName := "E:\\routeadd.bat"
+	localFileName := "D:\\test.txt"
 
 	cosObj := New(AppID, SecretID, SecretKey)
 	err, jsr := cosObj.CreateFolder(Bucket, dirname)
 	if err == nil {
 		t.Log("cosObj.CreateFolder ok")
 	} else {
-		t.Logf("cosObj.CreateFolder failed, err=%v", err)
-		t.Log(jsr)
-	}
-
-	err, jsr = cosObj.ListFolder(Bucket, "dir", 100, "", 0, "")
-	if err == nil {
-		t.Log("cosObj.ListFolder ok")
-	} else {
-		t.Logf("cosObj.ListFolder failed, err=%v", err)
+		t.Errorf("cosObj.CreateFolder failed, err=%v", err)
 		t.Log(jsr)
 	}
 
@@ -48,7 +40,7 @@ func TestFunction(t *testing.T) {
 	if err == nil {
 		t.Log("cosObj.UpdateFolder ok")
 	} else {
-		t.Logf("cosObj.UpdateFolder failed, err=%v", err)
+		t.Errorf("cosObj.UpdateFolder failed, err=%v", err)
 		t.Log(jsr)
 	}
 
@@ -56,7 +48,7 @@ func TestFunction(t *testing.T) {
 	if err == nil {
 		t.Log("cosObj.QueryFolder ok")
 	} else {
-		t.Logf("cosObj.QueryFolder failed, err=%v", err)
+		t.Errorf("cosObj.QueryFolder failed, err=%v", err)
 		t.Log(jsr)
 	}
 
@@ -64,14 +56,23 @@ func TestFunction(t *testing.T) {
 	if err == nil {
 		t.Log("cosObj.UploadFile ok")
 	} else {
-		t.Logf("cosObj.UploadFile failed, err=%v", err)
+		t.Errorf("cosObj.UploadFile failed, err=%v", err)
 		t.Log(jsr)
 	}
+
+	err, jsr = cosObj.ListFolder(Bucket, dirname, 100, "", 0, "")
+	if err == nil {
+		t.Log("cosObj.ListFolder ok")
+	} else {
+		t.Errorf("cosObj.ListFolder failed, err=%v", err)
+		t.Log(jsr)
+	}
+
 	err, jsr = cosObj.UpdateFile(Bucket, file, "test update file")
 	if err == nil {
 		t.Log("cosObj.UpdateFile ok")
 	} else {
-		t.Logf("cosObj.UpdateFile failed, err=%v", err)
+		t.Errorf("cosObj.UpdateFile failed, err=%v", err)
 		t.Log(jsr)
 	}
 
@@ -79,7 +80,7 @@ func TestFunction(t *testing.T) {
 	if err == nil {
 		t.Log("cosObj.QueryFile ok")
 	} else {
-		t.Logf("cosObj.QueryFile failed, err=%v", err)
+		t.Errorf("cosObj.QueryFile failed, err=%v", err)
 		t.Log(jsr)
 	}
 
@@ -87,7 +88,23 @@ func TestFunction(t *testing.T) {
 	if err == nil {
 		t.Log("cosObj.DeleteFile ok")
 	} else {
-		t.Logf("cosObj.DeleteFile failed, err=%v", err)
+		t.Errorf("cosObj.DeleteFile failed, err=%v", err)
+		t.Log(jsr)
+	}
+
+	err, jsr = cosObj.UploadFileSlice(Bucket, file, localFileName)
+	if err == nil {
+		t.Log("cosObj.UploadFileSlice ok")
+	} else {
+		t.Errorf("cosObj.UploadFileSlice failed, err=%v", err)
+		t.Log(jsr)
+	}
+
+	err, jsr = cosObj.DeleteFile(Bucket, file)
+	if err == nil {
+		t.Log("cosObj.DeleteFile ok")
+	} else {
+		t.Errorf("cosObj.DeleteFile failed, err=%v", err)
 		t.Log(jsr)
 	}
 
@@ -95,7 +112,7 @@ func TestFunction(t *testing.T) {
 	if err == nil {
 		t.Log("cosObj.DeleteFolder ok")
 	} else {
-		t.Logf("cosObj.DeleteFolder failed, err=%v", err)
+		t.Errorf("cosObj.DeleteFolder failed, err=%v", err)
 		t.Log(jsr)
 	}
 }

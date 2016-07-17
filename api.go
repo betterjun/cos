@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/url"
@@ -196,44 +197,53 @@ func (c *COS) UploadFileSlice(bucket, filePath, localFileName string) (err error
 	if err != nil {
 		return err, nil
 	}
-	fileContent, err := ioutil.ReadAll(fileHandle)
+
+	hash := sha1.New()
+	fileSize, err := io.Copy(hash, fileHandle)
 	if err != nil {
 		return err, nil
 	}
 
-	sha := fmt.Sprintf("%x", sha1.Sum(nil))
-	fileSize := int64(len(fileContent))
-	err, ret := c.createUploadSliceSession(bucket, filePath, sha, fileSize)
+	err, ret := c.createUploadSliceSession(bucket, filePath, fmt.Sprintf("%x", hash.Sum(nil)), fileSize)
+	if err != nil || ret.Get("code").MustInt() != 0 {
+		return err, nil
+	}
 
-	var session string
-	var offset int64
-	var sliceSize int64
+	session := ret.Get("data").Get("session").MustString()
+	sliceSize := ret.Get("data").Get("slice_size").MustInt64()
+	offset := ret.Get("data").Get("offset").MustInt64()
+	sliceBuffer := &bytes.Buffer{}
 	for {
+		_, err = fileHandle.Seek(offset, 0)
+		if err != nil {
+			return err, nil
+		}
+
+		_, err = io.CopyN(sliceBuffer, fileHandle, sliceSize)
+		if err != nil && err != io.EOF {
+			return err, nil
+		}
+
+		// TODO : 根据session和offset开多线程上传
+		slice, _ := ioutil.ReadAll(sliceBuffer)
+		err, ret = c.uploadSlice(slice, bucket, filePath, session, offset)
 		if err != nil || ret.Get("code").MustInt() != 0 {
 			return err, nil
 		}
 
-		retData := ret.Get("data")
-		if retData.Get("url").MustString() != "" { // 已传完
+		// 以下两种情况为已传完
+		if ret.Get("data").Get("access_url").MustString() != "" {
 			break
 		}
-		if session == "" {
-			session = retData.Get("session").MustString()
-		}
-		if offset == 0 {
-			offset = retData.Get("offset").MustInt64()
-		}
-		if sliceSize == 0 {
-			retData.Get("slice_size").MustInt64()
-		}
 
-		err, ret = c.uploadSlice(fileContent[offset:offset+sliceSize+1], bucket, filePath, session, offset)
 		offset = offset + sliceSize
 		if offset >= fileSize {
 			break
 		}
+		sliceBuffer.Reset()
 	}
-	return nil, nil
+
+	return nil, ret
 }
 
 func (c *COS) createUploadSliceSession(bucket, filePath, sha string, fileSize int64) (err error, jsonResp *simplejson.Json) {
@@ -247,6 +257,7 @@ func (c *COS) createUploadSliceSession(bucket, filePath, sha string, fileSize in
 	url := formatFileURL(c.AppID, bucket, filePath)
 	sign := SignMore(c.AppID, c.SecretID, c.SecretKey, bucket, defaultSignExpireTime)
 	return doHttpRequest("POST", url, sign, writer.FormDataContentType(), buffer.Bytes())
+
 }
 
 func (c *COS) uploadSlice(fileContent []byte, bucket, filePath, session string, offset int64) (err error, jsonResp *simplejson.Json) {

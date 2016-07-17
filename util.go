@@ -88,19 +88,19 @@ func doHttpRequest(method, url, sign, contentType string, content []byte) (err e
 		return fmt.Errorf("send request error: %v", err), nil
 	}
 	defer resp.Body.Close()
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read response error: %v", err), nil
 	}
 
-	//fmt.Println("doHttpRequest resp :", string(body))
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("HTTP StatusCode: %v, Body: %s", resp.StatusCode, body), nil
-	}
-
 	jsrResp, err = simplejson.NewJson(body)
 	if err != nil {
 		return fmt.Errorf("decode response error: %v, Body: %s", err, body), nil
+	}
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("HTTP StatusCode: %v, Body: %s", resp.StatusCode, body), jsrResp
 	}
 
 	return nil, jsrResp
