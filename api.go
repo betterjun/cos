@@ -128,6 +128,7 @@ func (c *COS) UploadFile(bucket, filePath, localFileName string) (err error, jso
 	if err != nil {
 		return err, nil
 	}
+	defer fileHandle.Close()
 	fileContent, err := ioutil.ReadAll(fileHandle)
 	if err != nil {
 		return err, nil
@@ -197,6 +198,7 @@ func (c *COS) UploadFileSlice(bucket, filePath, localFileName string) (err error
 	if err != nil {
 		return err, nil
 	}
+	defer fileHandle.Close()
 
 	hash := sha1.New()
 	fileSize, err := io.Copy(hash, fileHandle)
