@@ -5,7 +5,6 @@ qq对象存储服务(COS) golang api.
 https://www.qcloud.com/doc/product/227
 
 使用示例：
-* 建立对象
 
 	cosObj := New(AppID, SecretID, SecretKey)
 
