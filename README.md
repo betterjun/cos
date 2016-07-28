@@ -5,10 +5,11 @@ qq对象存储服务(COS) golang api.
 https://www.qcloud.com/doc/product/227
 
 使用示例：
+	// 建立对象
 
 	cosObj := New(AppID, SecretID, SecretKey)
 
-* 创建文件夹
+	// 创建文件夹
 
 	err, jsr := cosObj.CreateFolder(Bucket, dirname)
 	if err == nil {
@@ -18,7 +19,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 更新文件夹属性
+	// 更新文件夹属性
 
 	err, jsr = cosObj.UpdateFolder(Bucket, dirname, "test update")
 	if err == nil {
@@ -28,7 +29,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 查询文件夹属性
+	// 查询文件夹属性
 
 	err, jsr = cosObj.QueryFolder(Bucket, dirname)
 	if err == nil {
@@ -38,7 +39,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 上传文件
+	// 上传文件
 
 	err, jsr = cosObj.UploadFile(Bucket, file, localFileName)
 	if err == nil {
@@ -48,7 +49,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 列出文件夹下的文件或子目录
+	// 列出文件夹下的文件或子目录
 
 	err, jsr = cosObj.ListFolder(Bucket, dirname, 100, "", 0, "")
 	if err == nil {
@@ -58,7 +59,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 更新文件属性
+	// 更新文件属性
 
 	err, jsr = cosObj.UpdateFile(Bucket, file, "test update file")
 	if err == nil {
@@ -68,7 +69,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 查询文件属性
+	// 查询文件属性
 
 	err, jsr = cosObj.QueryFile(Bucket, file)
 	if err == nil {
@@ -78,7 +79,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 删除文件
+	// 删除文件
 	
 	err, jsr = cosObj.DeleteFile(Bucket, file)
 	if err == nil {
@@ -88,7 +89,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 文件分片上传，适用于较大文件
+	// 文件分片上传，适用于较大文件
 
 	err, jsr = cosObj.UploadFileSlice(Bucket, file, localFileName)
 	if err == nil {
@@ -98,7 +99,7 @@ https://www.qcloud.com/doc/product/227
 		t.Log(jsr)
 	}
 
-* 删除目录
+	// 删除目录
 
 	err, jsr = cosObj.DeleteFolder(Bucket, dirname)
 	if err == nil {
