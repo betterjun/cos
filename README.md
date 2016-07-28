@@ -4,6 +4,10 @@ qq对象存储服务(COS) golang api.
 文档地址
 https://www.qcloud.com/doc/product/227
 
+所有接口均返回error和simplejson.Json指针，客户应首先判定error是否为空，再决定是否使用simplejson.Json指针。
+error为空，simplejson.Json肯定有值，保存有COS返回的信息。
+error不为空，simplejson.Json通常为空，有时不一定为空，会带回一些错误信息。
+
 使用示例：
 
 	// 建立对象
